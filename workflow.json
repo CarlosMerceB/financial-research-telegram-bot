@@ -1,0 +1,440 @@
+{
+  "name": "Financial Research Telegram Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        80,
+        48
+      ],
+      "id": "7a599434-d98b-48ef-8f90-7ce35044c907",
+      "name": "Telegram Trigger",
+      "webhookId": "YOUR_WEBHOOK_ID",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json.message.text.trim().toUpperCase();\n\n// Crypto → Yahoo format: BTC-USD\nconst cryptoMap = {\n  'BTC': 'BTC-USD', 'BITCOIN': 'BTC-USD',\n  'ETH': 'ETH-USD', 'ETHEREUM': 'ETH-USD',\n  'SOL': 'SOL-USD', 'SOLANA': 'SOL-USD',\n  'XRP': 'XRP-USD', 'ADA': 'ADA-USD',\n  'DOGE': 'DOGE-USD', 'DOGECOIN': 'DOGE-USD',\n  'DOT': 'DOT-USD', 'POLKADOT': 'DOT-USD',\n  'AVAX': 'AVAX-USD', 'AVALANCHE': 'AVAX-USD',\n  'MATIC': 'MATIC-USD', 'POLYGON': 'MATIC-USD',\n  'LINK': 'LINK-USD', 'CHAINLINK': 'LINK-USD',\n  'BNB': 'BNB-USD', 'UNI': 'UNI-USD',\n  'ATOM': 'ATOM-USD', 'NEAR': 'NEAR-USD',\n  'APT': 'APT-USD', 'ARB': 'ARB-USD',\n  'OP': 'OP-USD', 'SUI': 'SUI-USD',\n};\n\n// Index → Yahoo format: ^SYMBOL\nconst indexMap = {\n  'SPX': '^GSPC', 'S&P': '^GSPC', 'S&P500': '^GSPC', 'SP500': '^GSPC',\n  'NASDAQ': '^IXIC', 'QQQ': 'QQQ',\n  'DOW': '^DJI', 'DJIA': '^DJI',\n  'IBEX': '^IBEX', 'IBEX35': '^IBEX',\n  'FTSE': '^FTSE', 'DAX': '^GDAXI',\n  'NIKKEI': '^N225', 'N225': '^N225',\n  'CAC40': '^FCHI', 'HANGSENG': '^HSI',\n  'EUROSTOXX': '^STOXX50E',\n};\n\n// Commodity → Yahoo format: SYMBOL=F\nconst commodityMap = {\n  'GOLD': 'GC=F', 'SILVER': 'SI=F',\n  'OIL': 'CL=F', 'CRUDE': 'CL=F', 'WTI': 'CL=F',\n  'BRENT': 'BZ=F', 'GAS': 'NG=F', 'NATGAS': 'NG=F',\n  'COPPER': 'HG=F', 'PLATINUM': 'PL=F',\n  'CORN': 'ZC=F', 'WHEAT': 'ZW=F', 'COCOA': 'CC=F',\n  'SUGAR': 'SB=F', 'COFFEE': 'KC=F', 'COTTON': 'CT=F',\n};\n\nlet assetType = 'stock';\nlet ticker = input;\nlet displayName = input;\n\nif (cryptoMap[input]) {\n  assetType = 'crypto';\n  ticker = cryptoMap[input];\n  displayName = input;\n} else if (indexMap[input]) {\n  assetType = 'index';\n  ticker = indexMap[input];\n  displayName = input;\n} else if (commodityMap[input]) {\n  assetType = 'commodity';\n  ticker = commodityMap[input];\n  displayName = input;\n}\n\nconst chatId = $input.first().json.message.chat.id;\n\nreturn [{\n  json: {\n    ticker,\n    assetType,\n    displayName,\n    originalInput: input,\n    chatId\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -80
+      ],
+      "id": "b2e5f271-e47d-4579-99d1-0dc8250b37ab",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "url": "=https://query1.finance.yahoo.com/v8/finance/chart/{{ $json.ticker }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "range",
+              "value": "1y"
+            },
+            {
+              "name": "interval",
+              "value": "1d"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        384,
+        48
+      ],
+      "id": "0d87fa31-06b1-4f6c-a93c-62019e1ec829",
+      "name": "GET Stock Prices"
+    },
+    {
+      "parameters": {
+        "jsCode": "const chartData = $input.first().json.chart.result[0];\nconst meta = chartData.meta;\nconst timestamps = chartData.timestamp;\nconst closes = chartData.indicators.adjclose[0].adjclose;\n\n// ---- Dynamic company name & currency ----\nconst companyName = meta.longName || meta.shortName || meta.symbol || 'Unknown';\nconst currency = meta.currency || 'USD';\n\n// Currency symbol mapping\nconst currencySymbols = {\n  'USD': '$', 'EUR': '€', 'GBP': '£', 'JPY': '¥',\n  'CHF': 'CHF ', 'CAD': 'C$', 'AUD': 'A$', 'HKD': 'HK$',\n  'CNY': '¥', 'KRW': '₩', 'INR': '₹', 'BRL': 'R$',\n  'SEK': 'kr', 'NOK': 'kr', 'DKK': 'kr', 'SGD': 'S$',\n  'MXN': 'MX$', 'ZAR': 'R', 'TRY': '₺', 'PLN': 'zł',\n  'ILS': '₪', 'TWD': 'NT$', 'THB': '฿', 'MYR': 'RM',\n};\nconst currencySymbol = currencySymbols[currency] || currency + ' ';\n\n// ---- Price calculations ----\nconst currentPrice = closes[closes.length - 1];\nconst prevClose = closes[closes.length - 2];\n\n// YTD start\nconst currentYear = new Date().getFullYear();\nlet ytdStartPrice = null;\nfor (let i = 0; i < timestamps.length; i++) {\n  const date = new Date(timestamps[i] * 1000);\n  if (date.getFullYear() === currentYear) {\n    ytdStartPrice = closes[i];\n    break;\n  }\n}\n\n// YoY = first data point (~1 year ago)\nconst yoyStartPrice = closes[0];\n\n// Growth percentages\nconst ytdGrowth = ytdStartPrice\n  ? ((currentPrice - ytdStartPrice) / ytdStartPrice * 100).toFixed(2)\n  : 'N/A';\nconst yoyGrowth = ((currentPrice - yoyStartPrice) / yoyStartPrice * 100).toFixed(2);\nconst dailyChange = ((currentPrice - prevClose) / prevClose * 100).toFixed(2);\n\n// Get ticker info from parser node\nconst prevData = $('Code in JavaScript').first().json;\n\nreturn [{\n  json: {\n    ticker: prevData.ticker,\n    assetType: prevData.assetType,\n    displayName: companyName,\n    chatId: prevData.chatId,\n    currency,\n    currencySymbol,\n    currentPrice: currentPrice.toFixed(2),\n    prevClose: prevClose.toFixed(2),\n    dailyChange,\n    ytdGrowth,\n    yoyGrowth\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        -96
+      ],
+      "id": "d204c5f1-d800-4b83-a5c2-6c869bc04d70",
+      "name": "Calculate Metrics"
+    },
+    {
+      "parameters": {
+        "url": "https://query1.finance.yahoo.com/v1/finance/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.displayName }} stock"
+            },
+            {
+              "name": "newsCount",
+              "value": "3"
+            },
+            {
+              "name": "quotesCount",
+              "value": "0"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        656,
+        64
+      ],
+      "id": "725ae938-1e64-4382-af46-10728b6124ac",
+      "name": "GET News"
+    },
+    {
+      "parameters": {
+        "jsCode": "const news = $input.first().json.news || [];\nconst metrics = $('Calculate Metrics').first().json;\n\n// Format top 3 news articles\nconst newsFormatted = news.slice(0, 3).map((article, i) => {\n  const title = article.title || 'No title';\n  const publisher = article.publisher || 'Unknown';\n  const link = article.link || '';\n  return `${i + 1}. *${title}*\\n   _${publisher}_\\n   ${link}`;\n}).join('\\n\\n');\n\nreturn [{\n  json: {\n    ...metrics,\n    newsFormatted,\n    newsRaw: news.slice(0, 3)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        -96
+      ],
+      "id": "facd7840-38f6-4b0c-aa4f-95c432ac03e3",
+      "name": "MERGE Data"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "YOUR_ANTHROPIC_API_KEY"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1232,
+        -48
+      ],
+      "id": "b91723ca-0726-4b1e-a60e-1ba1b8e3c6ed",
+      "name": "LLM Summary"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\n\nconst prompt = `You are a senior equity/macro research analyst at a top-tier investment bank. Produce a concise but high-signal research flash note for the following asset.\n\nASSET PROFILE:\nName: ${d.displayName}\nTicker: ${d.ticker}\nAsset Class: ${d.assetType}\nCurrency: ${d.currency}\n\nMARKET DATA:\nCurrent Price: ${d.currencySymbol}${d.currentPrice}\nPrevious Close: ${d.currencySymbol}${d.prevClose}\nDaily Change: ${d.dailyChange}%\nYTD Performance: ${d.ytdGrowth}%\nYoY Performance: ${d.yoyGrowth}%\n\nRECENT HEADLINES:\n${d.newsRaw.map((a, i) => `${i+1}. ${a.title} (${a.publisher})`).join('\\n')}\n\nFORMAT YOUR RESPONSE EXACTLY AS FOLLOWS:\n\nSECTOR: [Identify the sector and industry this asset belongs to, e.g. \"Technology | Software & IT Services\" or \"Commodities | Precious Metals\"]\n\nMARKET SNAPSHOT\nAnalyze the price action: is the asset trending up, down, or consolidating? Put the daily move in context of the YTD and YoY trajectory. Mention key levels if obvious from the data. 2-3 sentences max.\n\nNEWS IMPACT\nFor each headline, assess the likely market impact: bullish, bearish, or neutral catalyst. Connect headlines to the price action where possible. One sentence per headline. IMPORTANT: Only analyze news that is directly about ${d.displayName}. Ignore any headline that refers to a different company or asset.\n\nRISK FACTORS\nIdentify 2-3 key risks or catalysts to watch based on the data and headlines. Be specific — name sectors, macro drivers, or corporate events.\n\nOUTLOOK\nSynthesize a 2-3 sentence forward-looking view. What is the most probable near-term direction? What would change the thesis?\n\nRULES:\n- Use plain text only, no markdown, no asterisks, no bullet points\n- Reference actual numbers from the data\n- Be direct and opinionated like a real analyst, not generic\n- Keep total length under 1200 characters\n- Only discuss ${d.displayName} — do not mention unrelated companies from the headlines\n- End with: This is an automated summary, not financial advice.`;\n\nreturn [{\n  json: {\n    ...d,\n    requestBody: {\n      model: \"claude-sonnet-4-20250514\",\n      max_tokens: 1024,\n      messages: [\n        { role: \"user\", content: prompt }\n      ]\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        80
+      ],
+      "id": "2e53a1a4-56a3-43d0-8526-349282b83921",
+      "name": "Build LLM Prompt"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $('Build LLM Prompt').first().json;\nconst aiText = $input.first().json.content[0].text;\nconst now = new Date().toLocaleDateString('en-GB', { \n  day: 'numeric', month: 'long', year: 'numeric' \n});\n\n// Color logic\nconst dailyColor = parseFloat(d.dailyChange) >= 0 ? '#10b981' : '#ef4444';\nconst ytdColor = parseFloat(d.ytdGrowth) >= 0 ? '#10b981' : '#ef4444';\nconst yoyColor = parseFloat(d.yoyGrowth) >= 0 ? '#10b981' : '#ef4444';\nconst dailyArrow = parseFloat(d.dailyChange) >= 0 ? '▲' : '▼';\nconst ytdArrow = parseFloat(d.ytdGrowth) >= 0 ? '▲' : '▼';\nconst yoyArrow = parseFloat(d.yoyGrowth) >= 0 ? '▲' : '▼';\n\n// Format AI text into paragraphs\nconst aiHtml = aiText.split('\\n').filter(l => l.trim()).map(l => {\n  if (l.match(/^(SECTOR:|MARKET SNAPSHOT|NEWS IMPACT|RISK FACTORS|OUTLOOK)/)) {\n    return `<h3 style=\"color:#1e3a5f; margin:18px 0 6px 0; font-size:13px; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid #e2e8f0; padding-bottom:4px;\">${l}</h3>`;\n  }\n  return `<p style=\"margin:4px 0; line-height:1.5;\">${l}</p>`;\n}).join('\\n');\n\n// News section\nconst newsHtml = d.newsRaw.slice(0, 3).map((a, i) => \n  `<div style=\"margin-bottom:10px;\">\n    <span style=\"color:#1e3a5f; font-weight:600;\">${i+1}.</span> \n    <a href=\"${a.link}\" style=\"color:#2563eb; text-decoration:none;\">${a.title}</a>\n    <br><span style=\"color:#94a3b8; font-size:11px;\">${a.publisher || ''}</span>\n  </div>`\n).join('');\n\nconst html = `<!DOCTYPE html>\n<html>\n<head><meta charset=\"utf-8\"></head>\n<body style=\"font-family: 'Helvetica Neue', Arial, sans-serif; max-width:660px; margin:0 auto; padding:40px; color:#1e293b; font-size:13px;\">\n  \n  <div style=\"border-bottom:3px solid #1e3a5f; padding-bottom:16px; margin-bottom:24px;\">\n    <h1 style=\"margin:0; color:#1e3a5f; font-size:22px;\">${d.displayName}</h1>\n    <p style=\"margin:4px 0 0 0; color:#64748b; font-size:13px;\">\n      Ticker: <strong>${d.ticker}</strong> | Currency: <strong>${d.currency}</strong> | Report Date: ${now}\n    </p>\n  </div>\n\n  <table style=\"width:100%; border-collapse:collapse; margin-bottom:24px;\">\n    <tr style=\"background:#f8fafc;\">\n      <td style=\"padding:12px; border:1px solid #e2e8f0;\"><strong>Current Price</strong></td>\n      <td style=\"padding:12px; border:1px solid #e2e8f0; text-align:right; font-size:18px; font-weight:700;\">\n        ${d.currencySymbol}${d.currentPrice}\n      </td>\n    </tr>\n    <tr>\n      <td style=\"padding:10px 12px; border:1px solid #e2e8f0;\">Previous Close</td>\n      <td style=\"padding:10px 12px; border:1px solid #e2e8f0; text-align:right;\">${d.currencySymbol}${d.prevClose}</td>\n    </tr>\n    <tr style=\"background:#f8fafc;\">\n      <td style=\"padding:10px 12px; border:1px solid #e2e8f0;\">Daily Change</td>\n      <td style=\"padding:10px 12px; border:1px solid #e2e8f0; text-align:right; color:${dailyColor}; font-weight:600;\">\n        ${dailyArrow} ${d.dailyChange}%\n      </td>\n    </tr>\n    <tr>\n      <td style=\"padding:10px 12px; border:1px solid #e2e8f0;\">YTD Growth</td>\n      <td style=\"padding:10px 12px; border:1px solid #e2e8f0; text-align:right; color:${ytdColor}; font-weight:600;\">\n        ${ytdArrow} ${d.ytdGrowth}%\n      </td>\n    </tr>\n    <tr style=\"background:#f8fafc;\">\n      <td style=\"padding:10px 12px; border:1px solid #e2e8f0;\">YoY Growth</td>\n      <td style=\"padding:10px 12px; border:1px solid #e2e8f0; text-align:right; color:${yoyColor}; font-weight:600;\">\n        ${yoyArrow} ${d.yoyGrowth}%\n      </td>\n    </tr>\n  </table>\n\n  <div style=\"margin-bottom:24px;\">\n    <h2 style=\"color:#1e3a5f; font-size:15px; border-bottom:2px solid #e2e8f0; padding-bottom:6px;\">AI Research Analysis</h2>\n    ${aiHtml}\n  </div>\n\n  <div style=\"margin-bottom:24px;\">\n    <h2 style=\"color:#1e3a5f; font-size:15px; border-bottom:2px solid #e2e8f0; padding-bottom:6px;\">Latest News</h2>\n    ${newsHtml}\n  </div>\n\n  <div style=\"margin-top:32px; padding-top:16px; border-top:1px solid #e2e8f0; color:#94a3b8; font-size:10px;\">\n    <p>This report was automatically generated. It is not financial advice. Data sourced from Yahoo Finance. AI analysis powered by Claude (Anthropic).</p>\n  </div>\n</body>\n</html>`;\n\nreturn [{\n  json: {\n    ...d,\n    aiSummary: aiText,\n    reportHtml: html,\n    fileName: `${d.ticker.replace(/[^a-zA-Z0-9]/g, '_')}_Report_${new Date().toISOString().split('T')[0]}.pdf`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        -192
+      ],
+      "id": "b8963fbc-efa5-489f-ac61-bdbd61053bb4",
+      "name": "Generate HTML Report"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.html2pdf.app/v1/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ \"html\": $json.reportHtml, \"apiKey\": \"YOUR_HTML2PDF_API_KEY\", \"format\": \"A4\", \"margin\": { \"top\": \"10mm\", \"bottom\": \"10mm\", \"left\": \"10mm\", \"right\": \"10mm\" } }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1552,
+        16
+      ],
+      "id": "6decc35a-cdf7-452a-b321-116f3163ae34",
+      "name": "Convert to PDF"
+    },
+    {
+      "parameters": {
+        "name": "={{ $('Generate HTML Report').first().json.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2032,
+        -320
+      ],
+      "id": "0e5016ba-4685-4988-9c17-415528d40ebe",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "YOUR_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "name": "Google Drive OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Generate HTML Report').first().json.chatId }}",
+        "text": "=📊 *{{ $('Generate HTML Report').first().json.displayName }}* (${{ $('Generate HTML Report').first().json.ticker }})  \n\n💰 Price: {{ $('Generate HTML Report').first().json.currencySymbol }}{{ $('Generate HTML Report').first().json.currentPrice }} {{ $('Generate HTML Report').first().json.currency }} \n📈 Daily: {{ $('Generate HTML Report').first().json.dailyChange }}% \n YTD: {{ $('Generate HTML Report').first().json.ytdGrowth }}% \n YoY: {{ $('Generate HTML Report').first().json.yoyGrowth }}%  \n\n🤖 *AI Analysis:*  \n\n{{ $json.content[0].text }}  \n\n📰 *Latest News:*  \n\n{{ $('Generate HTML Report').first().json.newsRaw.slice(0, 3).map((a, i) => `${i+1}. [${a.title}](${a.link})`).join('\\n\\n') }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2032,
+        -128
+      ],
+      "id": "8cac8316-06c1-48ef-93fc-bf6958f7ee2f",
+      "name": "Send a text message",
+      "webhookId": "YOUR_WEBHOOK_ID",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendDocument",
+        "chatId": "={{ $('Generate HTML Report').first().json.chatId }}",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "=Full report attached & saved to Google Drive."
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2016,
+        48
+      ],
+      "id": "b63e6d96-d72f-48a4-a3c7-8669fae4427d",
+      "name": "Send pdf",
+      "webhookId": "YOUR_WEBHOOK_ID",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram Bot"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "GET Stock Prices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET Stock Prices": {
+      "main": [
+        [
+          {
+            "node": "Calculate Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Metrics": {
+      "main": [
+        [
+          {
+            "node": "GET News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET News": {
+      "main": [
+        [
+          {
+            "node": "MERGE Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE Data": {
+      "main": [
+        [
+          {
+            "node": "Build LLM Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Summary": {
+      "main": [
+        [
+          {
+            "node": "Generate HTML Report",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build LLM Prompt": {
+      "main": [
+        [
+          {
+            "node": "LLM Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate HTML Report": {
+      "main": [
+        [
+          {
+            "node": "Convert to PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to PDF": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send pdf",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "00000000-0000-0000-0000-000000000000",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "YOUR_INSTANCE_ID"
+  },
+  "id": "YOUR_WORKFLOW_ID",
+  "tags": []
+}
