@@ -130,6 +130,10 @@ At moderate personal usage (~100-200 queries/month):
 - [ ] Scheduled daily/weekly reports for watchlist tickers
 This project is part of a broader technical portfolio demonstrating financial data engineering, API integration, and AI-powered automation capabilities.
 
-## License
+## Screenshots
 
-This project is for educational and portfolio purposes. The n8n workflow JSON is provided as-is.
+![screenshot](./screenshots/workflow.png)
+![screenshot](./screenshots/output.png)
+![screenshot](./screenshots/output2.png)
+![screenshot](./screenshots/output3.png)
+![screenshot](./screenshots/output4.png)
