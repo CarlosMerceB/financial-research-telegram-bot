@@ -133,7 +133,7 @@ This project is part of a broader technical portfolio demonstrating financial da
 ## Screenshots
 
 ![screenshot](./screenshots/workflow.png)
-![screenshot](./screenshots/output.png)
-![screenshot](./screenshots/output2.png)
-![screenshot](./screenshots/output3.png)
-![screenshot](./screenshots/output4.png)
+![screenshot](./screenshots/Output.png)
+![screenshot](./screenshots/Output_2.png)
+![screenshot](./screenshots/Output_3.png)
+![screenshot](./screenshots/Output_4.png)
