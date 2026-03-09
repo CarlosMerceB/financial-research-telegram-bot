@@ -128,12 +128,6 @@ At moderate personal usage (~100-200 queries/month):
 - [ ] Invalid ticker validation with suggestions
 - [ ] Multi-language report support
 - [ ] Scheduled daily/weekly reports for watchlist tickers
-
-## Author
-
-**Carlos** — Account Manager at Minsait (Indra) | MBA in International Management
-Building toward Business Controller / Financial Analyst / Data Analyst roles.
-
 This project is part of a broader technical portfolio demonstrating financial data engineering, API integration, and AI-powered automation capabilities.
 
 ## License
